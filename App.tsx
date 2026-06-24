@@ -1,0 +1,20 @@
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { AdSessionProvider } from '@/mraid/AdSessionContext';
+import { AdSessionOverlay } from '@/mraid/AdSessionOverlay';
+import { RootNavigator } from '@/navigation/RootNavigator';
+
+// Render order matters here: AdSessionOverlay is mounted AFTER RootNavigator
+// as a sibling, so it visually paints on top of whatever screen is active —
+// including the transparent Expand route — without ever living inside the
+// navigator's own component tree.
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AdSessionProvider>
+        <RootNavigator />
+        <AdSessionOverlay />
+      </AdSessionProvider>
+    </SafeAreaProvider>
+  );
+}
