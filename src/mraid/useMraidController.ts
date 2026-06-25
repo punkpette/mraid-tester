@@ -4,7 +4,7 @@ import type { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { buildBridgeScript } from './bridgeScript';
 import { MraidController } from './MraidController';
 import type { MraidControllerOptions } from './MraidController';
-import type { MraidControllerState } from './types';
+import type { MraidControllerState, MraidPlacementTypeValue, MraidSize } from './types';
 
 export interface UseMraidControllerResult {
   webViewRef: React.RefObject<WebView | null>;
@@ -18,6 +18,10 @@ export interface UseMraidControllerResult {
   // Lets async native action handlers (storePicture, etc.) report their
   // outcome back into the call log after the fact.
   logActionResult: (method: string, success: boolean, message: string) => void;
+  // Lets the Ad Size Selector change the ad's logical size/placement
+  // before (or between) creative loads.
+  setAdSize: (size: MraidSize) => void;
+  setPlacementType: (placementType: MraidPlacementTypeValue) => void;
 }
 
 // `useSyncExternalStore` is the most efficient way to subscribe a React
@@ -64,6 +68,18 @@ export function useMraidController(options: MraidControllerOptions): UseMraidCon
     };
   }, [controller]);
 
+  const setAdSize = useMemo(() => {
+    return (size: MraidSize) => {
+      controller.setAdSize(size);
+    };
+  }, [controller]);
+
+  const setPlacementType = useMemo(() => {
+    return (placementType: MraidPlacementTypeValue) => {
+      controller.setPlacementType(placementType);
+    };
+  }, [controller]);
+
   return {
     webViewRef,
     injectedJavaScriptBeforeContentLoaded,
@@ -71,5 +87,7 @@ export function useMraidController(options: MraidControllerOptions): UseMraidCon
     onMessage,
     onLoadEnd,
     logActionResult,
+    setAdSize,
+    setPlacementType,
   };
 }

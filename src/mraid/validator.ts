@@ -10,6 +10,11 @@ import type { LogSeverity, MraidControllerState, MraidLogEntry } from './types';
 
 const VALID_METHOD_NAMES: ReadonlySet<string> = new Set(Object.values(MraidMethod));
 const DEPRECATED_METHOD_NAMES: ReadonlySet<string> = new Set(Object.values(MraidDeprecatedMethod));
+// Deprecated methods are recognized but not "valid" per MRAID 3.0 — must check both.
+const ALL_RECOGNIZED_METHODS: ReadonlySet<string> = new Set([
+  ...VALID_METHOD_NAMES,
+  ...DEPRECATED_METHOD_NAMES,
+]);
 
 let logIdCounter = 0;
 
@@ -51,7 +56,7 @@ export function validateCall(
 ): MraidLogEntry[] {
   const entries: MraidLogEntry[] = [];
 
-  if (!VALID_METHOD_NAMES.has(method)) {
+  if (!ALL_RECOGNIZED_METHODS.has(method)) {
     entries.push(createLogEntry('error', method, `Unknown MRAID method "${method}" was called.`));
 
     return entries;

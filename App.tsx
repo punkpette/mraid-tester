@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import mobileAds from 'react-native-google-mobile-ads';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AdSessionProvider } from '@/mraid/AdSessionContext';
@@ -9,6 +11,14 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 // including the transparent Expand route — without ever living inside the
 // navigator's own component tree.
 export default function App() {
+  useEffect(() => {
+    mobileAds()
+      .initialize()
+      .catch((error: unknown) => {
+        console.warn('Google Mobile Ads SDK initialization failed:', error);
+      });
+  }, []);
+
   return (
     <SafeAreaProvider>
       <AdSessionProvider>

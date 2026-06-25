@@ -95,6 +95,23 @@ export class MraidController {
     this.appendLog(createLogEntry(success ? 'info' : 'error', method, message));
   }
 
+  // Changes the ad's logical size. Only meaningful before a creative is
+  // loaded or while in the "default" state — this represents picking a
+  // new ad unit size from the selector, not a runtime resize() call from
+  // the creative itself (that's handled separately in applySideEffects).
+  public setAdSize(size: MraidSize): void {
+    const { x, y } = this.state.defaultPosition;
+
+    this.updateState({
+      defaultPosition: { x, y, width: size.width, height: size.height },
+      currentPosition: { x, y, width: size.width, height: size.height },
+    });
+  }
+
+  public setPlacementType(placementType: MraidPlacementTypeValue): void {
+    this.updateState({ placementType });
+  }
+
   // Entry point: called with the raw JSON string posted from the WebView.
   public handleBridgeMessage(rawMessage: string): void {
     let parsed: MraidBridgeMessage;
