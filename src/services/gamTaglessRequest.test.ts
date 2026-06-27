@@ -2,6 +2,7 @@ import {
   buildGamAdUnitPath,
   buildTaglessRequestUrl,
   fetchTaglessCreative,
+  getInterstitialRequestSize,
 } from './gamTaglessRequest';
 import type { TaglessRequestParams } from './gamTaglessRequest';
 
@@ -12,6 +13,20 @@ const BASE_PARAMS: TaglessRequestParams = {
   height: 250,
   keyValues: [],
 };
+
+describe('getInterstitialRequestSize', () => {
+  it('returns portrait size (320x480) when height > width', () => {
+    expect(getInterstitialRequestSize(400, 800)).toEqual({ width: 320, height: 480 });
+  });
+
+  it('returns landscape size (480x320) when width > height', () => {
+    expect(getInterstitialRequestSize(800, 400)).toEqual({ width: 480, height: 320 });
+  });
+
+  it('returns portrait size (320x480) when width === height (square edge case)', () => {
+    expect(getInterstitialRequestSize(500, 500)).toEqual({ width: 320, height: 480 });
+  });
+});
 
 describe('buildGamAdUnitPath', () => {
   it('combines networkCode and adUnitPath with a leading slash', () => {

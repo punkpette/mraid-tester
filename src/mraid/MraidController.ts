@@ -5,6 +5,7 @@ import type {
   MraidControllerState,
   MraidLogEntry,
   MraidPlacementTypeValue,
+  MraidResizeProperties,
   MraidSize,
 } from './types';
 
@@ -112,6 +113,22 @@ export class MraidController {
     this.updateState({ placementType });
   }
 
+  // Prepares the controller for a second (or subsequent) creative load into
+  // the same persistent WebView. The WebView is about to reload with new
+  // source HTML, so the per-session flags must be cleared before the new
+  // bridge fires its own __bridgeReady. User configuration (placement type,
+  // ad size, screen size) is intentionally preserved — those belong to the
+  // test session, not to any individual creative.
+  public resetForNewCreative(): void {
+    this.hasFiredReady = false;
+    this.calledMethods.clear();
+    this.updateState({
+      state: MraidState.Loading,
+      isViewable: false,
+      resizeProperties: null,
+    });
+  }
+
   // Entry point: called with the raw JSON string posted from the WebView.
   public handleBridgeMessage(rawMessage: string): void {
     let parsed: MraidBridgeMessage;
@@ -169,8 +186,36 @@ export class MraidController {
         break;
       }
 
+      case MraidMethod.SetResizeProperties: {
+        const props = args[0];
+
+        if (!isValidResizeProps(props)) {
+          this.appendLog(
+            createLogEntry(
+              'error',
+              method,
+              'setResizeProperties() received invalid properties — width and height must be positive numbers.',
+            ),
+          );
+          break;
+        }
+
+        this.updateState({ resizeProperties: props });
+        break;
+      }
+
       case MraidMethod.Resize: {
-        this.updateState({ state: MraidState.Resized });
+        // resizeProperties is guaranteed non-null here: the validator blocks
+        // resize() when resizeProperties === null, so applySideEffects is only
+        // reached after a successful setResizeProperties() call.
+        const rp = this.state.resizeProperties!;
+        const x = (this.state.screenSize.width - rp.width) / 2;
+        const y = (this.state.screenSize.height - rp.height) / 2;
+
+        this.updateState({
+          state: MraidState.Resized,
+          currentPosition: { x, y, width: rp.width, height: rp.height },
+        });
         this.fireEvent('stateChange', [MraidState.Resized]);
         break;
       }
@@ -179,7 +224,18 @@ export class MraidController {
         const nextState =
           this.state.state === MraidState.Default ? MraidState.Hidden : MraidState.Default;
 
-        this.updateState({ state: nextState, isViewable: nextState !== MraidState.Hidden });
+        const update: Partial<MraidControllerState> = {
+          state: nextState,
+          isViewable: nextState !== MraidState.Hidden,
+        };
+
+        if (nextState === MraidState.Default) {
+          // Returning from expanded/resized — restore the pre-expand position
+          // so getCurrentPosition() reflects the inline slot again.
+          update.currentPosition = { ...this.state.defaultPosition };
+        }
+
+        this.updateState(update);
         this.fireEvent('stateChange', [nextState]);
 
         if (nextState === MraidState.Hidden) {
@@ -245,4 +301,18 @@ export class MraidController {
       listener(this.state);
     }
   }
+}
+
+// Validates that args[0] from a setResizeProperties bridge call is usable.
+// Only width and height are required to be valid positive numbers — the rest
+// of the spec fields (customClosePosition, offsetX, offsetY, allowOffscreen)
+// are passed through as-is, since downstream code only reads width and height.
+function isValidResizeProps(value: unknown): value is MraidResizeProperties {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const v = value as Record<string, unknown>;
+
+  return typeof v.width === 'number' && v.width > 0 && typeof v.height === 'number' && v.height > 0;
 }

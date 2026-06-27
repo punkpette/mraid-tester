@@ -63,9 +63,7 @@ export function validateCall(
   }
 
   if (DEPRECATED_METHOD_NAMES.has(method)) {
-    entries.push(
-      createLogEntry('warning', method, `"${method}" is deprecated in MRAID 3.0.`),
-    );
+    entries.push(createLogEntry('warning', method, `"${method}" is deprecated in MRAID 3.0.`));
   }
 
   if (!context.hasFiredReady && !METHODS_ALLOWED_BEFORE_READY.has(method)) {
@@ -95,7 +93,11 @@ export function validateCall(
   if (method === MraidMethod.Expand) {
     if (state.state === MraidState.Expanded) {
       entries.push(
-        createLogEntry('warning', method, 'expand() was called while already in the expanded state.'),
+        createLogEntry(
+          'warning',
+          method,
+          'expand() was called while already in the expanded state.',
+        ),
       );
     }
 

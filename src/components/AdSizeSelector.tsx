@@ -8,24 +8,28 @@ import type { AdSizePreset } from '@/constants/adSizes';
 interface AdSizeSelectorProps {
   selectedWidth: number;
   selectedHeight: number;
+  isInterstitialSelected: boolean;
   onSelectPreset: (preset: AdSizePreset) => void;
   onApplyCustom: (width: number, height: number) => void;
 }
 
-function isPresetSelected(preset: AdSizePreset, width: number, height: number): boolean {
+function isPresetSelected(
+  preset: AdSizePreset,
+  width: number,
+  height: number,
+  isInterstitialSelected: boolean,
+): boolean {
   if (preset.isInterstitial) {
-    // Interstitial sizes itself to the full screen, so it never matches a
-    // fixed width/height — it's flagged separately via placementType
-    // upstream. Here we just never highlight it as "selected" by size.
-    return false;
+    return isInterstitialSelected;
   }
 
-  return preset.width === width && preset.height === height;
+  return !isInterstitialSelected && preset.width === width && preset.height === height;
 }
 
 export function AdSizeSelector({
   selectedWidth,
   selectedHeight,
+  isInterstitialSelected,
   onSelectPreset,
   onApplyCustom,
 }: AdSizeSelectorProps) {
@@ -43,12 +47,24 @@ export function AdSizeSelector({
     onApplyCustom(width, height);
   };
 
+  const isApplyDisabled =
+    parseInt(customWidth, 10) === selectedWidth && parseInt(customHeight, 10) === selectedHeight;
+
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Ad Size</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
+      >
         {IAB_AD_SIZE_PRESETS.map((preset) => {
-          const isSelected = isPresetSelected(preset, selectedWidth, selectedHeight);
+          const isSelected = isPresetSelected(
+            preset,
+            selectedWidth,
+            selectedHeight,
+            isInterstitialSelected,
+          );
 
           return (
             <Pressable
@@ -71,28 +87,34 @@ export function AdSizeSelector({
         })}
       </ScrollView>
 
-      <View style={styles.customRow}>
-        <TextInput
-          style={[styles.input, styles.customInput]}
-          placeholder="Width"
-          placeholderTextColor={NEUTRAL.textSecondary}
-          value={customWidth}
-          onChangeText={setCustomWidth}
-          keyboardType="number-pad"
-        />
-        <Text style={styles.customSeparator}>×</Text>
-        <TextInput
-          style={[styles.input, styles.customInput]}
-          placeholder="Height"
-          placeholderTextColor={NEUTRAL.textSecondary}
-          value={customHeight}
-          onChangeText={setCustomHeight}
-          keyboardType="number-pad"
-        />
-        <Pressable style={styles.applyButton} onPress={handleApplyCustom}>
-          <Text style={styles.applyButtonText}>Apply</Text>
-        </Pressable>
-      </View>
+      {!isInterstitialSelected ? (
+        <View style={styles.customRow}>
+          <TextInput
+            style={[styles.input, styles.customInput]}
+            placeholder="Width"
+            placeholderTextColor={NEUTRAL.textSecondary}
+            value={customWidth}
+            onChangeText={setCustomWidth}
+            keyboardType="number-pad"
+          />
+          <Text style={styles.customSeparator}>×</Text>
+          <TextInput
+            style={[styles.input, styles.customInput]}
+            placeholder="Height"
+            placeholderTextColor={NEUTRAL.textSecondary}
+            value={customHeight}
+            onChangeText={setCustomHeight}
+            keyboardType="number-pad"
+          />
+          <Pressable
+            style={[styles.applyButton, isApplyDisabled ? styles.applyButtonDisabled : null]}
+            onPress={handleApplyCustom}
+            disabled={isApplyDisabled}
+          >
+            <Text style={styles.applyButtonText}>Apply</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -166,6 +188,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  applyButtonDisabled: {
+    opacity: 0.5,
   },
   applyButtonText: {
     color: '#FFFFFF',

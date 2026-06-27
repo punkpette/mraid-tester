@@ -22,6 +22,10 @@ export interface UseMraidControllerResult {
   // before (or between) creative loads.
   setAdSize: (size: MraidSize) => void;
   setPlacementType: (placementType: MraidPlacementTypeValue) => void;
+  // Resets per-creative session state (hasFiredReady, calledMethods, MRAID
+  // state) so the next creative gets a clean slate without remounting the
+  // WebView. Must be called before setCreativeHtml changes the source.
+  resetForNewCreative: () => void;
 }
 
 // `useSyncExternalStore` is the most efficient way to subscribe a React
@@ -44,6 +48,7 @@ export function useMraidController(options: MraidControllerOptions): UseMraidCon
   );
 
   const injectedJavaScriptBeforeContentLoaded = useMemo(
+    // eslint-disable-next-line react-hooks/refs -- intentional: controller is controllerRef.current, a stable singleton created once; reading it inside useMemo during render is safe because its identity never changes after construction
     () => buildBridgeScript(controller.getState()),
     [controller],
   );
@@ -80,6 +85,12 @@ export function useMraidController(options: MraidControllerOptions): UseMraidCon
     };
   }, [controller]);
 
+  const resetForNewCreative = useMemo(() => {
+    return () => {
+      controller.resetForNewCreative();
+    };
+  }, [controller]);
+
   return {
     webViewRef,
     injectedJavaScriptBeforeContentLoaded,
@@ -89,5 +100,6 @@ export function useMraidController(options: MraidControllerOptions): UseMraidCon
     logActionResult,
     setAdSize,
     setPlacementType,
+    resetForNewCreative,
   };
 }

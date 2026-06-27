@@ -26,6 +26,11 @@ export interface AdSessionContextValue extends UseMraidControllerResult {
   // VideoWatcher (in navigation/) reacts to this to push/pop the player route.
   videoUrl: string | null;
   closeVideo: () => void;
+  // User-controlled toggle for whether the inline ad preview is shown.
+  // Doesn't apply while the creative itself is in "expanded"/"resized" —
+  // those always render regardless, since the creative triggered them.
+  isAdVisible: boolean;
+  toggleAdVisible: () => void;
 }
 
 const AdSessionContext = createContext<AdSessionContextValue | null>(null);
@@ -40,9 +45,10 @@ interface AdSessionProviderProps {
 // matching how the app is actually used (test one creative at a time).
 export function AdSessionProvider({ children }: AdSessionProviderProps) {
   const { width, height } = useWindowDimensions();
-  const [creativeHtml, setCreativeHtml] = useState('');
+  const [creativeHtml, setCreativeHtmlState] = useState('');
   const [inlineRect, setInlineRect] = useState<InlineRect | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isAdVisible, setIsAdVisible] = useState(false);
   const slotNodeRef = useRef<View | null>(null);
 
   // useMraidController's options (including onNativeAction) are needed at
@@ -52,6 +58,7 @@ export function AdSessionProvider({ children }: AdSessionProviderProps) {
   // resolves, mraidRef.current has already been set from the latest render.
   const mraidRef = useRef<UseMraidControllerResult | null>(null);
 
+  // eslint-disable-next-line react-hooks/refs -- intentional .current unwrap at render time: useRef(fn).current gives a stable callback reference without triggering re-renders; the value is frozen at construction and never reassigned
   const handleNativeAction = useRef((method: string, args: unknown[]) => {
     if (method === 'playVideo') {
       setVideoUrl(String(args[0]));
@@ -66,17 +73,21 @@ export function AdSessionProvider({ children }: AdSessionProviderProps) {
   }).current;
 
   const mraid = useMraidController({
-    placementType: MraidPlacementType.Inline,
-    adSize: { width: 300, height: 250 },
+    placementType: MraidPlacementType.Interstitial,
+    adSize: { width, height },
     screenSize: { width, height },
     onNativeAction: handleNativeAction,
   });
 
+  // eslint-disable-next-line react-hooks/refs -- intentional latest-value ref pattern: writing mraidRef.current during render keeps the callback closure below always pointing at the current hook result without adding it as a useMemo dep (which would cause stale-closure bugs)
   mraidRef.current = mraid;
 
   // Called via the inline slot's ref. Measures its on-screen position so
   // the overlay can draw the WebView in exactly the right place while
-  // state is "default".
+  // state is "default". Deferred with requestAnimationFrame because
+  // calling measureInWindow synchronously inside onLayout can return
+  // coordinates from a layout pass that hasn't fully committed yet,
+  // especially right after sibling content above the slot changes size.
   const registerInlineSlot = (node: View | null) => {
     slotNodeRef.current = node;
 
@@ -84,8 +95,10 @@ export function AdSessionProvider({ children }: AdSessionProviderProps) {
       return;
     }
 
-    node.measureInWindow((x, y, measuredWidth, measuredHeight) => {
-      setInlineRect({ x, y, width: measuredWidth, height: measuredHeight });
+    requestAnimationFrame(() => {
+      node.measureInWindow((x, y, measuredWidth, measuredHeight) => {
+        setInlineRect({ x, y, width: measuredWidth, height: measuredHeight });
+      });
     });
   };
 
@@ -93,17 +106,33 @@ export function AdSessionProvider({ children }: AdSessionProviderProps) {
     setVideoUrl(null);
   };
 
+  const toggleAdVisible = () => {
+    setIsAdVisible((previous) => !previous);
+  };
+
   const value = useMemo<AdSessionContextValue>(
     () => ({
       ...mraid,
       creativeHtml,
-      setCreativeHtml,
+      // Wraps the raw state setter so the controller resets its per-session
+      // flags before the WebView receives new source HTML. Both `mraid` and
+      // `creativeHtml` are already deps of this memo, so the comparison and
+      // the reset call always see current values.
+      setCreativeHtml: (html: string) => {
+        if (html !== creativeHtml) {
+          mraid.resetForNewCreative();
+        }
+
+        setCreativeHtmlState(html);
+      },
       inlineRect,
       registerInlineSlot,
       videoUrl,
       closeVideo,
+      isAdVisible,
+      toggleAdVisible,
     }),
-    [mraid, creativeHtml, inlineRect, videoUrl],
+    [mraid, creativeHtml, inlineRect, videoUrl, isAdVisible],
   );
 
   return <AdSessionContext.Provider value={value}>{children}</AdSessionContext.Provider>;

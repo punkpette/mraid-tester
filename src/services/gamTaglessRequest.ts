@@ -67,6 +67,20 @@ export function buildTaglessRequestUrl(params: TaglessRequestParams): string {
   return `${GAM_TAGLESS_BASE_URL}?${queryParts.join('&')}`;
 }
 
+// Returns the IAB-standard interstitial request size for GAM line item matching.
+// GAM out-of-page/interstitial units only match on 320x480 (portrait) or 480x320
+// (landscape) — the device's real pixel size never matches a line item.
+export function getInterstitialRequestSize(
+  screenWidth: number,
+  screenHeight: number,
+): { width: number; height: number } {
+  if (screenHeight >= screenWidth) {
+    return { width: 320, height: 480 };
+  }
+
+  return { width: 480, height: 320 };
+}
+
 // Fetches a creative from GAM using a tagless request.
 // An empty 200 response means "no fill" — this is a valid outcome, not a network error.
 // Network failures are caught and returned as { success: false } rather than thrown.
